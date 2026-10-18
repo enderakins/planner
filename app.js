@@ -346,7 +346,15 @@ function loginScreen() {
     try {
       const r = await fetch(CFG.url + '/auth/v1/token?grant_type=password', {method:'POST',
         headers:{apikey:CFG.key, 'Content-Type':'application/json'}, body:JSON.stringify({email:em.value.trim(), password:pw.value})});
-      if (!r.ok) { err.textContent = 'Неверная почта или пароль.'; return; }
+      if (!r.ok) {
+        let m = ''; try { const j = await r.json(); m = j.error_description || j.msg || j.message || j.error || ''; } catch (x) {}
+        if (/invalid login/i.test(m)) m = 'Неверная почта или пароль.';
+        else if (/not confirmed/i.test(m)) m = 'Почта не подтверждена: в Supabase откройте Authentication, Users, выберите пользователя и подтвердите почту.';
+        else if (r.status === 401 || r.status === 403 || /api key|apikey/i.test(m)) m = 'Сервер не принял ключ из config.js. Проверьте, что вставлен ключ anon public (или Publishable), целиком.';
+        else if (r.status === 404) m = 'Адрес проекта в config.js указан неверно.';
+        else m = 'Ошибка входа (' + r.status + '): ' + m;
+        err.textContent = m; return;
+      }
       setSession(await r.json()); boot();
     } catch (e) { err.textContent = 'Нет связи с сервером. Проверьте интернет и повторите.'; }
   };
